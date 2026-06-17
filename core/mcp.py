@@ -29,11 +29,13 @@ class MCPHandlerHttp:
       "method":method,
       "params":params
     }
-    return requests.post(self.baseurl,json=payload).json()
+    data = self.session.post(self.baseurl,json=payload)
+    return data.json()
 
   def __init__(self,url):
     self._id_counter = itertools.count(1)
     self.baseurl = url
+    self.session = requests.Session()
     self.send_request("initialize",
       {
         "protocolVersion":"2024-11-05",
@@ -49,7 +51,60 @@ class MCPHandlerHttp:
     self.tools_json = r.get("tools",[])
     for i in self.tools_json:
       self.tool_names.append(i.get("name"))
-      i["parameters"] = i.pop("inputSchema") # do this once, here, at loading.
+      i["parameters"] = i.pop("inputSchema") # do this once, here, at loading. 
+      if "icons" in i.keys():
+        print("mcp: tokenmaxer scum detected. removing icons")
+        i.pop("icons")
+
+class MCPHandlerSSE(MCPHandlerHttp):
+  def send_notification(self,method,params={}):
+    request_id = next(self._id_counter)
+    payload = {
+      "jsonrpc":"2.0",
+      "id":request_id,
+      "method":method,
+      "params":params
+    }
+    resp = self.session.post(self.baseurl,json=payload,headers=self._hdrs,stream=True)
+    if resp.headers.get("Mcp-Session-Id",None) is not None:
+      print("mcp: got mcp-session-id header")
+      self._hdrs["Mcp-Session-Id"] = resp.headers.get("Mcp-Session-Id",None)
+    event = {}
+    for line in resp.iter_lines(decode_unicode=True):
+      if not line:
+        continue
+      if line.startswith(":"): # comment
+        continue 
+      # print(line)
+      field,_,val = line.partition(":")
+      if field == "data":
+        event["data"] = event.get("data","") + val.strip()
+      else:
+        event[field] = val
+    return json.loads(event["data"])
+
+  def get_credential(self,url,fn):
+    with open(fn,"r") as f:
+      for l in f.readlines():
+        fileurl,_,bearer = l.rstrip().partition(",")
+        # dirty hack: https://github.com/mcpendpoint/ vs https://github.com/mcpendpoint
+        if fileurl.strip("/") == url.strip("/"):
+          print("mcp: found bearer for '%s' in credfile" % url)
+          return bearer
+    return None
+
+ 
+  def __init__(self,url):
+    _auth_token = None
+    if os.getenv("MCP_CREDFILE",None) is not None:
+      _auth_token = self.get_credential(url,os.getenv("MCP_CREDFILE"))
+    if _auth_token is None:
+      _auth_token = input("mcp: bearer token for mcp '%s' > " % url).strip()
+    self._hdrs = {
+      "Authorization":"Bearer " + _auth_token,
+      "Accept":"application/json,text/event-stream"
+    }
+    MCPHandlerHttp.__init__(self,url)
 
 class MCPHandlerStdio:
   def send_notification(self,method,params={}):
@@ -135,6 +190,9 @@ class MCPLoader:
     if mcpname.startswith("http"):
       print("mcp: loading http '%s'" % mcpname)
       self.mcplist.append(MCPHandlerHttp(mcpname))
+    elif mcpname.startswith("sse+"):
+      print("mcp: loading sse http '%s'" % mcpname)
+      self.mcplist.append(MCPHandlerSSE(mcpname[4:]))
     else:
       print("mcp: loading stdio '%s'" % mcpname)
       self.mcplist.append(MCPHandlerStdio(mcpname))

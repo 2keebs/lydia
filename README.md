@@ -27,6 +27,7 @@ You can set the following environment variables:
 ```
 - STFU (set to anything to remove the ask_user tool from default context)
 - MEMORY_DECAY (sets how aggressively memory decays. lower number = shorter memory)
+- MCP_CREDFILE (points to comma separated list of url,bearer token)
 - CONSECRATE_MEMORY (set this to disable purging memory. tool calls are still purged)
 - CMD_FW (comma-separated allowed commands for shell_ tools)
 - OPENAI_BASE_URL
