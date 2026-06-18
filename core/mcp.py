@@ -53,7 +53,7 @@ class MCPHandlerHttp:
       self.tool_names.append(i.get("name"))
       i["parameters"] = i.pop("inputSchema") # do this once, here, at loading. 
       if "icons" in i.keys():
-        print("mcp: tokenmaxer scum detected. removing icons")
+        # print("mcp: tokenmaxer scum detected. removing icons")
         i.pop("icons")
 
 class MCPHandlerSSE(MCPHandlerHttp):
@@ -101,7 +101,7 @@ class MCPHandlerSSE(MCPHandlerHttp):
     if _auth_token is None:
       _auth_token = input("mcp: bearer token for mcp '%s' > " % url).strip()
     self._hdrs = {
-      "Authorization":"Bearer " + _auth_token,
+      "Authorization":_auth_token,
       "Accept":"application/json,text/event-stream"
     }
     MCPHandlerHttp.__init__(self,url)
