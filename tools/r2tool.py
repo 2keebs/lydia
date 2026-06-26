@@ -5,6 +5,7 @@
 # less error-prone to simply use r2pipe (and does not run into wierd
 # issues with r2 processes shitting themselves, colour, etc etc.
 
+import os
 from typing import Annotated
 
 r2_loaded = False
@@ -26,7 +27,7 @@ def r2_open(filename: Annotated[str,"The file to open"]):
     lazy_load_r2()
   print("info: called r2_open('%s')" % filename)
   try:
-    r2_session = r2pipe.open(filename)
+    r2_session = r2pipe.open(os.path.expanduser(os.path.normpath(filename)))
     return "ok"
   except:
     return "error, could not open file"
@@ -46,7 +47,7 @@ def r2_close():
   global r2_session
   print("info: called r2_close()")
   if r2_session is not None:
-    r2_session.close()
+    r2_session.quit()
     r2_session = None
     return "ok"
   else:

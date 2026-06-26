@@ -155,7 +155,7 @@ class Agent:
 
   def crashlanding(self):
     prefix = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    fn = "%s.crash" % prefix
+    fn = "log-%s.crash" % prefix
     with open(fn,"w") as f:
       f.write(json.dumps(self.req[self._sz_memory],indent=2))
     print("crash: dumping memory to %s" % fn)

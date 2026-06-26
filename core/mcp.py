@@ -92,7 +92,6 @@ class MCPHandlerSSE(MCPHandlerHttp):
           print("mcp: found bearer for '%s' in credfile" % url)
           return bearer
     return None
-
  
   def __init__(self,url):
     _auth_token = None

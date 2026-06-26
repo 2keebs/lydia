@@ -18,6 +18,14 @@ from typing import Annotated
 # __init__(self,...), because it must
 # run(self,ctx), which hatchery calls
 
+def fread_helper(fn):
+  if os.path.isfile(fn) is False:
+    print("hatchery: fread_helper: '%s' is not a file"  %fn)
+    return "error, see log"
+  else:
+    with open(fn,"r") as f:
+      return f.read()
+  
 class Baneling:
   def __init__(self,node_name,tool_name,tool_args={}):
     print("baneling: initializing baneling '%s'" % node_name)
@@ -97,6 +105,7 @@ class Hatchery:
     user_inputs = self.nodegraph.get("inputs",{})
     file_inputs = self.nodegraph.get("files",{})
     self.ctx = {}
+    self.ctx["fread"] = fread_helper
     for i in user_inputs.keys():
       self.ctx[i] = input(user_inputs[i]).strip()  
     for i in file_inputs.keys():

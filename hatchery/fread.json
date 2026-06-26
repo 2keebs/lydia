@@ -1,0 +1,14 @@
+{
+  "name":"fread",
+  "desc":"Load a prompt from file and execute it",
+  "start":"FruitStoryBananas",
+  "inputs":{
+    "filename":"Enter a filename > "
+  },
+  "nodes":[
+  {
+    "name":"FruitStoryBananas",
+    "usr_prompt":"{{ ctx.fread(ctx.filename) }}"
+  }
+  ]
+}
