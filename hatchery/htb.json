@@ -1,47 +1,58 @@
 {
-  "name":"htb",
-  "desc":"Attempt to solve a hack-the-box system.",
-  "start":"nmap-starter",
-  "inputs":{
-    "ip_addr":"ctx.ip_addr: enter ip address > "
+  "name": "htb",
+  "desc": "Attempt to solve a hack-the-box system.",
+  "start": "nmap-starter",
+  "inputs": {
+    "ip_addr": "ctx.ip_addr: enter ip address > "
   },
-  "nodes":[
+  "nodes": [
     {
-      "name":"nmap-starter",
-      "type":"tool",
-      "tool_name":"shell_exec",
-      "tool_args":{
-        "command":"nmap -Pn -p 21,80 {{ ctx.ip_addr }}"
+      "name": "recon-split",
+      "usr_prompt": "Here is the results of nmap: \n{{ ctx.nmap_output }}\nIf a web server is running, use the 'web' tool to check for web vulnerabilities. Output any vulnerabilities or flags you find.",
+      "tools": [
+        "node:web"
+      ],
+      "model": "gpt-5.4"
+    },
+    {
+      "name": "web",
+      "usr_prompt": "You are playing a CTF. Use tools to browse the website at {{ ctx.ip_addr }}. Output any vulnerabilities or flags you find. Focus on SQLi or IDOR type bugs. Remember to check for id=0 when checking for IDOR.",
+      "model": "gpt-5.4",
+      "tools": [
+        "web_request",
+        "web_download_file"
+      ],
+      "save_output": "web_findings",
+      "next": "web-next"
+    },
+    {
+      "name": "web-next",
+      "usr_prompt": "You are playing a CTF. Here is a web security report: {{ ctx.web_findings }}. Here is the results of nmap: {{ ctx.nmap_output }}. Identify any credentials, and output the steps to use them.",
+      "model": "gpt-5.4",
+      "save_output": "web_nextsteps",
+      "next": "shell_next"
+    },
+    {
+      "name": "nmap-starter",
+      "type": "tool",
+      "tool_name": "shell_exec",
+      "tool_args": {
+        "command": "nmap -Pn -p 21,80 {{ ctx.ip_addr }}"
       },
-      "save_output":"nmap_output",
-      "next":"recon-split"
+      "comment": "asdf",
+      "save_output": "nmap_output",
+      "next": "recon-split"
     },
     {
-      "name":"recon-split",
-      "usr_prompt":"Here is the results of nmap: \n{{ ctx.nmap_output }}\nIf a web server is running, use the 'web' tool to check for web vulnerabilities. Output any vulnerabilities or flags you find.",
-      "tools":["node:web"],
-      "model":"gpt-5.4"
-    },
-    {
-      "name":"web",
-      "usr_prompt":"You are playing a CTF. Use tools to browse the website at {{ ctx.ip_addr }}. Output any vulnerabilities or flags you find. Focus on SQLi or IDOR type bugs. Remember to check for id=0 when checking for IDOR.",
-      "model":"gpt-5.4",
-      "tools":["web_request","web_download_file"],
-      "save_output":"web_findings",
-      "next":"web-next"
-    },
-    {
-      "name":"web-next",
-      "usr_prompt":"You are playing a CTF. Here is a web security report: {{ ctx.web_findings }}. Here is the results of nmap: {{ ctx.nmap_output }}. Identify any credentials, and output the steps to use them.",
-      "model":"gpt-5.4",
-      "save_output":"web_nextsteps",
-      "next":"shell_next"
-    },
-    {
-      "name":"shell_next",
-      "usr_prompt":"You are playing a CTF. Your target IP is {{ ctx.ip_addr }}. The current next steps are: {{ctx.web_nextsteps }}. Use tools to execute these steps, and try to get a user flag. Do not attempt to start a shell (bash, zsh, sh, etc). Use curl instead of ftp.",
-      "model":"gpt-5.4",
-      "tools":["shell_interactive_start","shell_interactive_read","shell_interactive_write","shell_interactive_kill"]
+      "name": "shell_next",
+      "usr_prompt": "You are playing a CTF. Your target IP is {{ ctx.ip_addr }}. The current next steps are: {{ctx.web_nextsteps }}. Use tools to execute these steps, and try to get a user flag. Do not attempt to start a shell (bash, zsh, sh, etc). Use curl instead of ftp.",
+      "model": "gpt-5.4",
+      "tools": [
+        "shell_interactive_start",
+        "shell_interactive_read",
+        "shell_interactive_write",
+        "shell_interactive_kill"
+      ]
     }
   ]
 }
