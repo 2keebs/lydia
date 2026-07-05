@@ -2,10 +2,8 @@
 
 import sys
 import os
-if os.getenv("OFF_WITH_HER_HEAD",default=None) is None:
-  from core.agent import Agent
-else:
-  from core.messaging import Agent
+import core.config
+Agent = None
 import core.memory
 import core.mcp
 import json
@@ -44,45 +42,49 @@ class Baneling:
     print("baneling: invoking function with fixed arguments")
     return self.tool_func(**fixed_args)
 
-class Drone(Agent):
-  def __init__(self,node_name,sys_prompt,usr_prompt,_tools=[],next=None,model=None,base_url=None,parent_hatchery=None,mcps=[],pytools=[]):
-    print("drone: initializing drone '%s'" % node_name)
-    self.mcp_loader = core.mcp.MCPLoader()
-    self.toolbox = tools.ToolLoader(Hatchery)
-    for p in pytools:
-      self.toolbox.load_pytool(p)
-    self.toolbox.execute_pytool_hooks(self)
-    self.parent_hatchery = parent_hatchery # allows cross-node calls
-    self.name = node_name
-    self.usr_prompt = usr_prompt
-    self.next = next
-    self.avail_tools = []
-    self.save_output = None
-    self.write_output = None
-    self.preserve_ctx = False
-    # -design note-
-    # it's tempting to just allow toolbox fetching, but this puts us
-    # in an awkward position with file_write. in practice, there is no
-    # good way to force models to use file_write appropriately - so
-    # just don't allow fetch_toolbox("file")
-    self.node_tools = []
-    for t in _tools:
-      if t.startswith("node:"):
-        self.node_tools.append(t[5:])
-      else:
-        self.avail_tools.append(t)
-    for m in mcps:
-      # print("loading mcp '%s'" % m)
-      self.mcp_loader.load_mcp(m)
-    super().__init__(sys_prompt=sys_prompt,tools=[self.toolbox.fetch(t) for t in self.avail_tools] + [self.parent_hatchery.generate_fn(t) for t in self.node_tools],model=model,base_url=base_url)
-    # print("ok")
+class Drone:
+  pass
 
-  def run(self,ctx):
-    super().flush_history()
-    super().set_mcploader(self.mcp_loader)
-    template = jinja2.Template(self.usr_prompt)
-    new_usr_prompt = template.render(ctx=ctx)
-    return super().req_loop(new_usr_prompt)
+def make_drone_class(agent_class):
+  class Drone_Class(agent_class):
+    def __init__(self,node_name,sys_prompt,usr_prompt,_tools=[],next=None,model=None,base_url=None,parent_hatchery=None,mcps=[],pytools=[]):
+      print("drone: initializing drone '%s'" % node_name)
+      self.mcp_loader = core.mcp.MCPLoader()
+      self.toolbox = tools.ToolLoader(Hatchery)
+      for p in pytools:
+        self.toolbox.load_pytool(p)
+      self.toolbox.execute_pytool_hooks(self)
+      self.parent_hatchery = parent_hatchery # allows cross-node calls
+      self.name = node_name
+      self.usr_prompt = usr_prompt
+      self.next = next
+      self.avail_tools = []
+      self.save_output = None
+      self.write_output = None
+      self.preserve_ctx = False
+      # -design note-
+      # it's tempting to just allow toolbox fetching, but this puts us
+      # in an awkward position with file_write. in practice, there is no
+      # good way to force models to use file_write appropriately - so
+      # just don't allow fetch_toolbox("file")
+      self.node_tools = []
+      for t in _tools:
+        if t.startswith("node:"):
+          self.node_tools.append(t[5:])
+        else:
+          self.avail_tools.append(t)
+      for m in mcps:
+        # print("loading mcp '%s'" % m)
+        self.mcp_loader.load_mcp(m)
+      super().__init__(sys_prompt=sys_prompt,tools=[self.toolbox.fetch(t) for t in self.avail_tools] + [self.parent_hatchery.generate_fn(t) for t in self.node_tools],model=model,base_url=base_url)
+      # print("ok")
+    def run(self,ctx):
+      super().flush_history()
+      super().set_mcploader(self.mcp_loader)
+      template = jinja2.Template(self.usr_prompt)
+      new_usr_prompt = template.render(ctx=ctx)
+      return super().req_loop(new_usr_prompt)
+  return Drone_Class
 
 class Hatchery:
   def runNode(self,nodename,input_str):
@@ -96,7 +98,17 @@ class Hatchery:
     return temp_fn
 
   def __init__(self, fn):
+    global Agent, Drone
     self.nodes = {}
+    if Agent is None:
+      if core.config.getenv("OFF_WITH_HER_HEAD",default=None) is None:
+        from core.agent import Agent
+      else:
+        from core.messaging import Agent
+      Drone = make_drone_class(Agent)
+    else:
+      print("???")
+      print(Agent)
     with open(fn) as f:
       self.nodegraph = json.loads(f.read())
     self.start = self.nodegraph["start"]
@@ -115,8 +127,8 @@ class Hatchery:
     for node in self.nodegraph["nodes"]:
       node_type = node.get("type","ai") # default
       if node_type == "ai":
-        node_model =  node.get("model",os.getenv("OPENAI_DEFAULT_MODEL","gpt-4o"))
-        node_base_url =  node.get("base_url",os.getenv("OPENAI_BASE_URL","https://api.openai.com/v1"))
+        node_model =  node.get("model",core.config.getenv("OPENAI_DEFAULT_MODEL","gpt-4o"))
+        node_base_url =  node.get("base_url",core.config.getenv("OPENAI_BASE_URL","https://api.openai.com/v1"))
         node_name =  node.get("name","%s" % uuid.uuid4())
         sys_prompt = node.get("sys_prompt","You are a helpful assistant.")
         usr_prompt = node["usr_prompt"]

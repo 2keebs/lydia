@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import inspect
+import core.config
 from typing import Annotated, get_args, get_origin
 import requests
 import json
@@ -15,10 +16,7 @@ from typing import Dict
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-DEBUG_REQUESTS=os.getenv("DEBUG_REQUESTS",default=False)
-if DEBUG_REQUESTS is not False:
-  print("info: DEBUG_REQUESTS set, dumping requests and response json")
-  DEBUG_REQUESTS = True
+DEBUG_REQUESTS = None
 
 MAX_RETRY = 10
 
@@ -87,7 +85,7 @@ def fn_to_tool_json(fn,tag=None):
     }
 
 class Agent:
-  def __init__(self, sys_prompt="You are a helpful assistant.", api_key=os.getenv("OPENAI_API_KEY",default=None), base_url=os.getenv("OPENAI_BASE_URL",default="https://api.openai.com/v1"), model="gpt-4o", timeout=300.0, tools=[], reasoning=None,max_output_tokens=None):
+  def __init__(self, sys_prompt="You are a helpful assistant.", api_key=core.config.getenv("OPENAI_API_KEY",default=None), base_url=core.config.getenv("OPENAI_BASE_URL",default="https://api.openai.com/v1"), model="gpt-4o", timeout=300.0, tools=[], reasoning=None,max_output_tokens=None):
     self._sz_memory = "input"
     self.asst_msg_queue = []
     self.api_key = api_key
@@ -128,7 +126,7 @@ class Agent:
     }
     # "Authorization": f"Bearer {self.api_key}",
     hdr["Authorization"] = f"Bearer {self.api_key}"
-    x_portkey_provider = os.getenv("X_PORTKEY_PROVIDER",default=None)
+    x_portkey_provider = core.config.getenv("X_PORTKEY_PROVIDER",default=None)
     if x_portkey_provider is not None:
       hdr["x-portkey-provider"] = x_portkey_provider
     return hdr
@@ -188,7 +186,12 @@ class Agent:
     print(data)
 
   def req_loop(self,user_input):
-    global DEBUG_REQUESTS
+    global DEBUG_REQUESTS    
+    if DEBUG_REQUESTS is None:
+      DEBUG_REQUESTS = core.config.getenv("DEBUG_REQUESTS",default=False)
+      if DEBUG_REQUESTS is not False:
+        print("info: DEBUG_REQUESTS set, dumping requests and response json")
+        DEBUG_REQUESTS = True
     RETN_DATA = None
     RETN_TOOL = False
     if user_input is None:

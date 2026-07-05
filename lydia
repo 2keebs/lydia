@@ -3,11 +3,7 @@
 import sys
 import os
 from typing import Annotated
-if os.getenv("OFF_WITH_HER_HEAD",default=None) is None:
-  from core.agent import Agent
-else:
-  print("info: off with her head! using anthropic-compatible agent core")
-  from core.messaging import Agent
+import core.config
 import core.hatchery
 import core.memory
 import core.mcp
@@ -18,11 +14,6 @@ import readline
 def ask_user(question: Annotated[str, "The question"]):
   return input(question + " > ").strip()
 ask_user.__doc__ = "Ask the user a question"
-
-if os.getenv("STFU",default=None) is not None:
-  ASK_USER_ARR = []
-else:
-  ASK_USER_ARR = [ask_user]
 
 Toolbox = tools.ToolLoader(core.hatchery.Hatchery)
 
@@ -57,13 +48,15 @@ def main():
   CFG_PERSONALITY = "You are a helpful assistant."
   CFG_SYS_PROMPT = ""
   CFG_TOOLS = []
-  CFG_MODEL = os.getenv("OPENAI_DEFAULT_MODEL",default="gpt-4.1-mini-2025-04-14")
+  CFG_MODEL = None
   CFG_REASONING = None
   CFG_HATCHERY = None
   DENIED_ALREADY = False
-  args,extra = getopt.getopt(sys.argv[1:],"ip:s:t:m:r:a:",["interactive","prompt=","system=","tool=","model=","reasoning=","persona=","toolbox=","agentic=","mcp=","mcp-deny=","pytool="])
+  args,extra = getopt.getopt(sys.argv[1:],"ic:p:s:t:m:r:a:",["cfg=","interactive","prompt=","system=","tool=","model=","reasoning=","persona=","toolbox=","agentic=","mcp=","mcp-deny=","pytool="])
   for arg,val in args:
-    if arg in ["-p","--prompt"]:
+    if arg in ["-c","--cfg"]:
+      core.config.initcfg(val)
+    elif arg in ["-p","--prompt"]:
       if CFG_USR_PROMPT is not None:
         print("fatal: do not supply -p twice")
         sys.exit(-1)
@@ -102,13 +95,28 @@ def main():
           CFG_PERSONALITY = f.read()
       else:
         print("warn: cannot open persona '%s'" % val)
+  core.config.defaultcfg()
+  EXTRA_TOOLS = core.config.getcfg("EXTRA_TOOLS",default=[])
+  for tool in EXTRA_TOOLS:
+    CFG_TOOLS.append(tool) 
+  if core.config.getenv("OFF_WITH_HER_HEAD",default=None) is None:
+    from core.agent import Agent
+  else:
+    print("info: off with her head! using anthropic-compatible agent core")
+    from core.messaging import Agent
+  if core.config.getenv("STFU",default=None) is not None:
+    ASK_USER_ARR = []
+  else:
+    ASK_USER_ARR = [ask_user]
+  if CFG_MODEL is None:
+    CFG_MODEL = core.config.getenv("OPENAI_DEFAULT_MODEL",default="gpt-4.1-mini-2025-04-14")
   if CFG_HATCHERY is not None:
     h = core.hatchery.Hatchery(CFG_HATCHERY)
     h.run()
     sys.exit(0)
-  got_riskaccept =  os.getenv("I_ACCEPT_THE_RISK",default=None)
-  got_cmdfw = os.getenv("CMD_FW",default=None)
-  got_vmsshargs = os.getenv("VM_SSHARGS",default=None)
+  got_riskaccept =  core.config.getenv("I_ACCEPT_THE_RISK",default=None)
+  got_cmdfw = core.config.getenv("CMD_FW",default=None)
+  got_vmsshargs = core.config.getenv("VM_SSHARGS",default=None)
   if (got_riskaccept is not None or got_cmdfw is not None or got_vmsshargs is not None) and len(CFG_TOOLS) == 0:
     print("fatal: tool safety constraints enabled, but 0 tools selected")
     sys.exit(-1)

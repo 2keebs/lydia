@@ -25,7 +25,7 @@ export X_PORTKEY_PROVIDER=<your_portkey_provider>
 Now, test functionality with:
 
 ```
-DEBUG_REQUESTS=1 ./harness.py -p hi
+DEBUG_REQUESTS=1 ./lydia -p hi
 ```
 
 You should see the full JSON requests dumped, and the text generation result of the request "hi".

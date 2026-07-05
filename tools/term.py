@@ -10,26 +10,32 @@ import termios
 import time
 import fcntl
 import struct
+import core.config
 
-# this is a special case only for localhost
-RISK_ACCEPT = os.getenv("I_ACCEPT_THE_RISK",default=None)
-if RISK_ACCEPT is not None:
-  if RISK_ACCEPT == "ISO27001":
-    # already imported vmtool, this just prints twice.
-    # print("warn: I_ACCEPT_THE_RISK set to ISO27001, running commands locally")
-    RISK_ACCEPT = True
-  else:
-    RISK_ACCEPT = False
+RISK_ACCEPT = None
+
+def risk_accept():
+  global RISK_ACCEPT
+  if RISK_ACCEPT is None:
+    RISK_ACCEPT = core.config.getenv("I_ACCEPT_THE_RISK",default=None)
+    if RISK_ACCEPT == "ISO27001":
+      RISK_ACCEPT = True
+    else:
+      RISK_ACCEPT = False
+  return RISK_ACCEPT
 
 PROCESS_LOCK = None
 
-CMD_FW = os.getenv("CMD_FW", default=None)
-if CMD_FW is not None:
-  CMD_FW = [a.strip() for a in CMD_FW.split(",")]
+CMD_FW = None
 
 def cmdfw(command):
   global CMD_FW
+  if CMD_FW is None:
+    CMD_FW = core.config.getenv("CMD_FW", default=None)
+    if CMD_FW is not None:
+      CMD_FW = [a.strip() for a in CMD_FW.split(",")]
   print("fw: firewalling '%s'" % command)
+
   if CMD_FW is None:
     manual_allow = input("fw: CMD_FW whitelist unset. allow this once? [y/N] > ").rstrip()
     if manual_allow == "y":
@@ -107,13 +113,13 @@ class ProcessPty:
 from typing import Annotated
 
 def term_start(command: Annotated[str, "The command to run"]):
-  global PROCESS_LOCK, RISK_ACCEPT
+  global PROCESS_LOCK
   if PROCESS_LOCK is not None:
     print("warn: term_start called with PROCESS_LOCK on")
     return "info: you need to call term_kill before starting a new process"
   if cmdfw(command) is False:
     return fwreject()
-  if RISK_ACCEPT is True:
+  if risk_accept() is True:
     print("warn: term_start('%s') called, locking pretend mutex, running locally" % command)
     PROCESS_LOCK = ProcessPty(command)
     time.sleep(0.5)

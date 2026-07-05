@@ -3,40 +3,48 @@
 import os
 import json
 
-CFG_DEFAULT = {}
+CFG_GLOBAL = None
 
-# - design note -
-# this is a json-based unified config system, which is designed to work across
-# different tools.
+# -design note-
+# this allows a config file to override environment variables, by loading
+# configs from a json file.
+# this allows us to pack a file with "default ok" configs, and then set a
+# bunch of settings at once using that (e.g. cc-mode.json)
 
-class Config:
-  def __init__(self,cfgblock,initCfg=None):
-    if cfgblock is None and initCfg is not None:
-      print("cfg: initializing config object via initCfg dict")
-      self.cfgblock = initCfg
-    else:
-      print("cfg: initializing config object via json")
-      self.cfgblock = json.loads(cfgblock)
+def defaultcfg():
+  global CFG_GLOBAL
+  if CFG_GLOBAL is None:
+    try:
+      with open(os.path.expanduser("~/.lydia/default.cfg"),"r") as f:
+        CFG_GLOBAL = json.loads(f.read())
+    except Exception as e:
+      print(e)
+      print("cfg: no default cfg available")
 
-  def get(self,cfgname,defaultval):
-    if cfgname in self.cfgblock.keys():
-      return self.cfgblock[cfgname]
-    else:
-      if os.getenv(cfgname,None) is not None:
-        return os.getenv(cfgname)
-      else:
-        return defaultval
+def initcfg(filename):
+  global CFG_GLOBAL
+  if os.path.isfile(filename) is False:
+    print("cfg: cannot load '%s', assuming empty")
+    return
+  with open(filename,"r") as f:
+    print("cfg: loading config '%s'" % filename)
+    CFG_GLOBAL = json.loads(f.read())
 
-  def set(self,cfgname,cfgval):
-    if cfgname in self.cfgblock.keys():
-      printf("cfg: overriding config '%s'" % cfgname)
-    self.cfgblock[cfgname] = cfgval 
-
-def LoadConfig(config_fn):
-  print("cfg: loading from '%s'" % config_fn)
-  if os.path.isfile(config_fn):
-    with open(config_fn,"r") as f:
-      cfg = Config(f.read())
+def getcfg(varname,default=None):
+  global CFG_GLOBAL
+  if CFG_GLOBAL is None:
+    return default
+  if varname in CFG_GLOBAL.keys():
+    return CFG_GLOBAL[varname]
   else:
-    cfg = Config(None,initCfg=CFG_DEFAULT)
-  return cfg
+    return default
+
+def getenv(varname,default=None):
+  global CFG_GLOBAL
+  if CFG_GLOBAL is None:
+    return os.getenv(varname,default=default)
+  if varname in CFG_GLOBAL.keys():
+    return CFG_GLOBAL[varname]
+  else:
+    return os.getenv(varname,default=default)
+

@@ -11,6 +11,7 @@ To get started, see [quickstart](docs/QUICKSTART.md).
 Use the following command line args:
 ```
 - -i/--interactive: interactive mode (i.e. chat interface)
+- -c/--cfg: use a config file
 - -p/--prompt: set the prompt
 - -m/--model: set the model
 - -t/--tool: load a single tool
@@ -23,7 +24,7 @@ Use the following command line args:
 - --persona <persona/name.md>: replace system prompt with persona
 ```
 
-You can set the following environment variables:
+You can set the following environment variables (note that these are overridden by -c's configuration file):
 ```
 - STFU (set to anything to remove the ask_user tool from default context)
 - MEMORY_DECAY (sets how aggressively memory decays. lower number = shorter memory)

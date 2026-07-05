@@ -169,7 +169,7 @@ def rebuild_listbox():
   listbox.insert(tk.END, f"[toplevel]")
   if len(json_obj.get("nodes",[])) != 0:
     nodelist = sorted([n["name"] for n in json_obj.get("nodes")])
-    print(nodelist)
+    # print(nodelist)
     for n in nodelist:
       listbox.insert(tk.END,n)
 

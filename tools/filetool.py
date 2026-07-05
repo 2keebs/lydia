@@ -4,21 +4,29 @@ import glob
 from typing import Annotated
 import sys
 import os
+import core.config
 from os.path import expanduser, normpath
 import subprocess
 
-FN_PREFIX = os.getenv("FN_SANDBOX",default=None)
-if FN_PREFIX is not None:
-  FN_PREFIX = expanduser(normpath(FN_PREFIX))
-
 MAX_DATA = 128000
+FN_PREFIX_PRIVATE = None
+
+def get_fn_prefix():
+  global FN_PREFIX_PRIVATE
+  if FN_PREFIX_PRIVATE is None:
+    FN_PREFIX_PRIVATE = core.config.getenv("FN_PREFIX",default=None)
+    if FN_PREFIX_PRIVATE is not None:
+      FN_PREFIX_PRIVATE = normpath(expanduser(FN_PREFIX_PRIVATE))
+    else:
+      print("fatal: FN_PREFIX is unset")
+      sys.exit(-1)
+    return FN_PREFIX_PRIVATE
+  else:
+    return FN_PREFIX_PRIVATE
 
 def file_rg(pattern: Annotated[str, "pattern to pass to search for with ripgrep."]):
-  global FN_PREFIX
+  FN_PREFIX = get_fn_prefix()
   print("info: file_rg('%s') called" % pattern)
-  if FN_PREFIX is None:
-    print("fatal: you must specify FN_SANDBOX env")
-    sys.exit(-1)
   result = subprocess.run(
     ["rg","--color=never" ,pattern, FN_PREFIX],
     capture_output=True,
@@ -35,10 +43,7 @@ def file_rg(pattern: Annotated[str, "pattern to pass to search for with ripgrep.
     return f"error: ripgrep failed: {result.stderr.strip()}"
 
 def file_mkdir(dirname: Annotated[str, "Name of directory to create"]):
-  global FN_PREFIX
-  if FN_PREFIX is None:
-    print("fatal: you must specify FN_SANDBOX env")
-    sys.exit(-1)
+  FN_PREFIX = get_fn_prefix()
   realpath = expanduser(normpath(dirname))
   if realpath.startswith(FN_PREFIX) is False:
     print("info: file_mkdir outside sandbox, normalizing path")
@@ -51,7 +56,8 @@ def file_mkdir(dirname: Annotated[str, "Name of directory to create"]):
   return "ok"
 
 def file_read(filename: Annotated[str, "Name of the file to read"], start: Annotated[int, "Location to start reading from"], bytes: Annotated[int, "Number of bytes to read. Use -1 to read the whole file."]):
-  global FN_PREFIX, MAX_DATA
+  global MAX_DATA
+  FN_PREFIX = get_fn_prefix()
   print("info: file_read(%s,%d,%d) called" % (filename,start,bytes))
   if FN_PREFIX is None:
     print("fatal: you must specify FN_SANDBOX env")
@@ -98,11 +104,9 @@ def file_read(filename: Annotated[str, "Name of the file to read"], start: Annot
       return "error: cannot read file, no permission"
 
 def file_write(filename: Annotated[str, "Name of the file to write to"], data: Annotated[str, "Data to write"], append: Annotated[bool, "True to append to end of file, False to write over existing data"]):
-  global FN_PREFIX, FILE_WRITE_PERMISSION
+  global FILE_WRITE_PERMISSION
+  FN_PREFIX = get_fn_prefix()
   print("info: file_write(%s,len(data)=%d) called" % (filename, len(data)))
-  if FN_PREFIX is None:
-    print("fatal: you must specify FN_SANDBOX env")
-    sys.exit(-1)
   realpath = expanduser(normpath(filename))
   if realpath.startswith(FN_PREFIX) is False:
     realpath = "/".join([FN_PREFIX,realpath])
@@ -114,10 +118,7 @@ def file_write(filename: Annotated[str, "Name of the file to write to"], data: A
   return "ok"
 
 def file_glob(pattern: Annotated[str, "Pattern to glob"]):
-  global FN_PREFIX
-  if FN_PREFIX is None:
-    print("fatal: you must specify FN_SANDBOX env")
-    sys.exit(-1)
+  FN_PREFIX = get_fn_prefix()
   print("info: file_glob(%s) called" % pattern)
   realpath = expanduser(normpath(pattern))
   if realpath.startswith(FN_PREFIX) is False:

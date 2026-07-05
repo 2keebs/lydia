@@ -6,7 +6,7 @@ Often, LLM's will go way off track and run whatever commands they want, includin
 To whitelist a set of commands and run them locally, do this:
 
 ```
-CMD_FW="r2,checksec" I_ACCEPT_THE_RISK="ISO27001" ./harness.py -p "Use r2 and checksec to analyze this binary. Tell me how many times it prints the word banana"
+CMD_FW="r2,checksec" I_ACCEPT_THE_RISK="ISO27001" ./lydia -p "Use r2 and checksec to analyze this binary. Tell me how many times it prints the word banana"
 ```
 
 The logic of running a command works as follows (in tools/vmtool.py):

@@ -5,10 +5,10 @@ import os
 import json
 import random
 import string
+import core.config
 
 MEMORY_FADE = {}
-MEMORY_DECAY = os.getenv("MEMORY_DECAY",default="6")
-MEMORY_DECAY = int(MEMORY_DECAY)
+MEMORY_DECAY = None
 
 def try_get_callid(evt):
   if "call_id" in evt.keys():    # openai / responses
@@ -26,6 +26,9 @@ def try_get_callid(evt):
 # called every 'turn' to flush old tool calls from memory.
 def memory_fade(input_array):
   global MEMORY_FADE, MEMORY_DECAY
+  if MEMORY_DECAY is None:
+    MEMORY_DECAY = core.config.getenv("MEMORY_DECAY",default="6")
+    MEMORY_DECAY = int(MEMORY_DECAY)
   if MEMORY_DECAY != -1:
     for evt in input_array:
       call_id = try_get_callid(evt)
@@ -49,7 +52,7 @@ def memory_fade(input_array):
         del(MEMORY_FADE[i])
   else:
     print("mem: memory_decay is -1, preserving tool calls")
-  if os.getenv("CONSECRATE_MEMORY",None) is None and MEMORY_DECAY != -1:
+  if core.config.getenv("CONSECRATE_MEMORY",None) is None and MEMORY_DECAY != -1:
     while len(input_array) > 3 * MEMORY_DECAY:
       print("mem: deleting turn")
       del(input_array[1])

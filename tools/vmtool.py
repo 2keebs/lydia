@@ -8,10 +8,9 @@ import os
 import time
 from os.path import expanduser, normpath
 import subprocess
+import core.config
 import queue, threading
 
-RISK_ACCEPT = os.getenv("I_ACCEPT_THE_RISK",default=None)
-VM_SSHARGS = os.getenv("VM_SSHARGS",default="")
 PROCESS_LOCK = None
 PROCESS_RD_QUEUE = None
 PROCESS_RD_THREAD = None
@@ -21,26 +20,42 @@ ANSI_ESCAPE_RE = re.compile(r"\x1B\x5B[0-9;]+m")
 def strip_terminal_colors(text: str) -> str:
   return ANSI_ESCAPE_RE.sub('', text)
 
-if RISK_ACCEPT is not None:
-  if RISK_ACCEPT == "ISO27001":
-    print("warn: I_ACCEPT_THE_RISK set to ISO27001, running commands locally")
-    RISK_ACCEPT = True
+
+CMD_FW = None
+YELLOW_BRICK_ROAD = None
+RISK_ACCEPT = None
+VM_SSHARGS = None
+
+def vm_sshargs():
+  global VM_SSHARGS
+  if VM_SSHARGS is None:
+    VM_SSHARGS = core.config.getenv("VM_SSHARGS",default="")
   else:
-    RISK_ACCEPT = False
+    return VM_SSHARGS
 
-CMD_FW = os.getenv("CMD_FW", default=None)
-if CMD_FW is not None:
-  CMD_FW = [a.strip() for a in CMD_FW.split(",")]
-
-YELLOW_BRICK_ROAD = os.getenv("YELLOW_BRICK_ROAD",default="NO")
-if YELLOW_BRICK_ROAD == "ISO31000":
-  x = input("warn: YELLOW_BRICK_ROAD selected, are you sure? [yes/N] > ").strip()
-  if x != "yes":
-    print("fatal: YELLOW_BRICK_ROAD confirmation denied by user")
-    sys.exit(-1)
+def risk_accept():
+  global RISK_ACCEPT
+  if RISK_ACCEPT is None:
+    RISK_ACCEPT = core.config.getenv("I_ACCEPT_THE_RISK",default=None)
+    if RISK_ACCEPT == "ISO27001":
+      RISK_ACCEPT = True
+    else:
+      RISK_ACCEPT = False
+  return RISK_ACCEPT
 
 def cmdfw(command):
   global CMD_FW,YELLOW_BRICK_ROAD
+  if CMD_FW is None:
+    CMD_FW = core.config.getenv("CMD_FW",default=None)
+    if CMD_FW is not None:
+      CMD_FW = [a.strip() for a in CMD_FW.split(",")]
+  if YELLOW_BRICK_ROAD is None:
+    YELLOW_BRICK_ROAD = core.config.getenv("YELLOW_BRICK_ROAD",default="NO")
+    if YELLOW_BRICK_ROAD == "ISO31000":
+      x = input("warn: YELLOW_BRICK_ROAD selected, are you sure? [yes/N] > ").strip()
+      if x != "yes":
+        print("fatal: YELLOW_BRICK_ROAD confirmation denied by user")
+        sys.exit(-1)
   print("fw: firewalling '%s'" % command)
   if YELLOW_BRICK_ROAD == "ISO31000":
     print("fw: YELLOW_BRICK_ROAD mode, allowing command")
@@ -78,13 +93,12 @@ def async_reader(pipe, q):
     PROCESS_RD_QUEUE.put(line)
 
 def shell_exec(command: Annotated[str, "The command to run"]):
-  global VM_SSHARGS, RISK_ACCEPT
-  if VM_SSHARGS is None and RISK_ACCEPT is False:
-    print("fatal: you must specify VM_SSHARGS to use shell_exec, or I_ACCEPT_THE_RISK to run locally")
+  if vm_sshargs() is None and risk_accept() is False:
+    print("fatal: you must specify vm_sshargs() to use shell_exec, or I_ACCEPT_THE_RISK to run locally")
     sys.exit(-1)
   if cmdfw(command) is False:
     return fwreject()
-  if RISK_ACCEPT is True:
+  if risk_accept() is True:
     print("warn: I_ACCEPT_THE_RISK detected, running shell_exec('%s') locally" % command)
     try:
       result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
@@ -92,12 +106,12 @@ def shell_exec(command: Annotated[str, "The command to run"]):
       return "process returned a non-zero status"
     return strip_terminal_colors(result.stdout)
   else:
-    if VM_SSHARGS.startswith("ssh ") is False:
+    if vm_sshargs().startswith("ssh ") is False:
       print("fatal: don't run local commands from ai you fucking retard")
       sys.exit(-1)
     command = command.replace("'", "\\'")
     command = command.replace("*", "\\*")
-    new_c = VM_SSHARGS + " '" + command + "'"
+    new_c = vm_sshargs() + " '" + command + "'"
     print("info: shell_exec('%s') called" % new_c)
     try:
       result = subprocess.run(new_c, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,errors="replace")
@@ -105,16 +119,14 @@ def shell_exec(command: Annotated[str, "The command to run"]):
       return "process returned a non-zero status"
     return strip_terminal_colors(result.stdout)
 
-global PROCESS_HANDLE
-
 def shell_interactive_start(command: Annotated[str, "The command to run"]):
-  global VM_SSHARGS, PROCESS_LOCK, PROCESS_RD_QUEUE, PROCESS_RD_THREAD, RISK_ACCEPT
+  global PROCESS_LOCK, PROCESS_RD_QUEUE, PROCESS_RD_THREAD
   if PROCESS_LOCK is not None:
     print("warn: shell_interactive_start called with PROCESS_LOCK on")
     return "error: you can only have one interactive process at a time"
   if cmdfw(command) is False:
     return fwreject()
-  if RISK_ACCEPT is True:
+  if risk_accept() is True:
     print("warn: shell_interactive_start('%s') called, locking pretend mutex, running locally" % command)
     PROCESS_LOCK = subprocess.Popen(
       command.split(),
@@ -125,12 +137,12 @@ def shell_interactive_start(command: Annotated[str, "The command to run"]):
       errors="replace"
     )
   else:
-    if VM_SSHARGS.startswith("ssh ") is False:
+    if vm_sshargs().startswith("ssh ") is False:
       print("fatal: don't run local commands from ai you fucking retard")
       sys.exit(-1)
     print("info: shell_interactive_start('%s') called, locking pretend mutex" % command)
     PROCESS_LOCK = subprocess.Popen(
-      VM_SSHARGS.split() + [command],
+      vm_sshargs().split() + [command],
       stdin=subprocess.PIPE,
       stdout=subprocess.PIPE,
       stderr=subprocess.STDOUT,

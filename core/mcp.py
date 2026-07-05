@@ -7,6 +7,7 @@ import itertools
 import sys
 import os
 import copy
+import core.config
 
 class MCPHandlerHttp:
   def send_request(self,method,params={}):
@@ -95,8 +96,8 @@ class MCPHandlerSSE(MCPHandlerHttp):
  
   def __init__(self,url):
     _auth_token = None
-    if os.getenv("MCP_CREDFILE",None) is not None:
-      _auth_token = self.get_credential(url,os.getenv("MCP_CREDFILE"))
+    if core.config.getenv("MCP_CREDFILE",None) is not None:
+      _auth_token = self.get_credential(url,core.config.getenv("MCP_CREDFILE"))
     if _auth_token is None:
       _auth_token = input("mcp: bearer token for mcp '%s' > " % url).strip()
     self._hdrs = {
