@@ -26,6 +26,7 @@ def try_get_callid(evt):
 # called every 'turn' to flush old tool calls from memory.
 def memory_fade(input_array):
   global MEMORY_FADE, MEMORY_DECAY
+  memories_purged = 0
   if MEMORY_DECAY is None:
     MEMORY_DECAY = core.config.getenv("MEMORY_DECAY",default="6")
     MEMORY_DECAY = int(MEMORY_DECAY)
